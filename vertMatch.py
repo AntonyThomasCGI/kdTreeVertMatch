@@ -85,6 +85,7 @@ def maya_useNewAPI():
 # end def maya_useNewAPI():
 
 
+# plugin meat and potatoes
 class vertMatch(om2.MPxCommand):
 
 	kPluginCmdName = "vertMatch"
