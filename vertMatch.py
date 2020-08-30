@@ -29,15 +29,16 @@ def buildKdTree(points, depth=0):
 
 	return {
 		'point': sorted_points[n / 2],
-		'left': buildKdTree(sorted_points[:n / 2], depth + 1),
-		'right': buildKdTree(sorted_points[n / 2 + 1:], depth + 1)
+		'negative': buildKdTree(sorted_points[:n / 2], depth + 1),
+		'positive': buildKdTree(sorted_points[n / 2 + 1:], depth + 1)
 	}
+# end def buildKdTree():
 
 
 def distanceSquare(point1, point2):
-
 	local_p = point1 - point2
 	return local_p[0] * local_p[0] + local_p[1] * local_p[1] + local_p[2] * local_p[2]
+# end def distanceSquare():
 
 
 def closerDistance(pivot, p1, p2):
@@ -54,31 +55,34 @@ def closerDistance(pivot, p1, p2):
 		return p1
 	else:
 		return p2
+# end def closerDistance():
 
 
-def closestPoint(tree, in_point, depth=0):
+def nearestNeighbor(tree, in_point, depth=0):
 	if tree is None:
 		return None
 
 	axis = depth % 3
 
 	if in_point[axis] < tree['point'][axis]:
-		next_branch = tree['left']
-		opposite_branch = tree['right']
+		next_branch = tree['negative']
+		opposite_branch = tree['positive']
 	else:
-		next_branch = tree['right']
-		opposite_branch = tree['left']
+		next_branch = tree['positive']
+		opposite_branch = tree['negative']
 
-	best = closerDistance(in_point, closestPoint(next_branch, in_point, depth + 1), tree['point'])
+	nearest = closerDistance(in_point, nearestNeighbor(next_branch, in_point, depth + 1), tree['point'])
 
-	if distanceSquare(in_point, best) > (in_point[axis] - tree['point'][axis]) ** 2:
-		best = closerDistance(in_point, closestPoint(opposite_branch, in_point, depth + 1), best)
+	if distanceSquare(in_point, nearest) > (in_point[axis] - tree['point'][axis]) ** 2:
+		nearest = closerDistance(in_point, nearestNeighbor(opposite_branch, in_point, depth + 1), nearest)
 
-	return best
+	return nearest
+# end def nearestNeighbor():
 
 
 def maya_useNewAPI():
 	pass
+# end def maya_useNewAPI():
 
 
 class vertMatch(om2.MPxCommand):
@@ -105,10 +109,12 @@ class vertMatch(om2.MPxCommand):
 
 		self.initialState = []
 		self.store_args = None
+	# end def __init__():
 
 	@staticmethod
 	def cmdCreator():
 		return vertMatch()
+	# end def cmdCreator():
 
 	@staticmethod
 	def createSyntax():
@@ -117,6 +123,7 @@ class vertMatch(om2.MPxCommand):
 		syntax.addFlag(vertMatch.mirrorFlag, vertMatch.mirrorFlagLong, om2.MSyntax.kBoolean)
 
 		return syntax
+	# end def createSyntax():
 
 	def doIt(self, args):
 		t = time.time()
@@ -174,15 +181,17 @@ class vertMatch(om2.MPxCommand):
 					iter_input.next()
 					continue
 
-			closest = closestPoint(vert_tree, input_point)
+			closest = nearestNeighbor(vert_tree, input_point)
 			iter_input.setPosition(closest, om2.MSpace.kWorld)
 
 			iter_input.next()
 
 		print('>>vertMatch: Matched verts in {}s.'.format(time.time() - t))
+	# end def doIt():
 
 	def isUndoable(self):
 		return True
+	# end def isUndoable
 
 	def undoIt(self):
 		self.iter_components.reset()
@@ -198,6 +207,8 @@ class vertMatch(om2.MPxCommand):
 
 	def redoIt(self):
 		self.doIt(self.store_args)
+	# end def redoIt():
+# end class vertMatch():
 
 
 def initializePlugin(plugin):
@@ -210,6 +221,7 @@ def initializePlugin(plugin):
 			"Failed to register command: %s\n" % vertMatch.kPluginCmdName
 		)
 		raise
+# end def initializePlugin():
 
 
 def uninitializePlugin(plugin):
@@ -221,3 +233,4 @@ def uninitializePlugin(plugin):
 			"Failed to unregister command: %s\n" % vertMatch.kPluginCmdName
 		)
 		raise
+# end def uninitializePlugin():
