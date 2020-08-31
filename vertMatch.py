@@ -11,8 +11,6 @@
 # ----------------------------------------------------------------------------------------------------------------------
 
 from maya.api import OpenMaya as om2
-import maya.cmds as cmds
-import time
 import sys
 
 
@@ -89,27 +87,15 @@ def maya_useNewAPI():
 class vertMatch(om2.MPxCommand):
 
 	kPluginCmdName = "vertMatch"
-
 	mirrorFlag = '-m'
 	mirrorFlagLong = '-mirror'
 
 	def __init__(self):
 		om2.MPxCommand.__init__(self)
 
-		# check if vert selection is BIG
-		if len(cmds.ls(sl=True, fl=True)) > 9999:
-			cmds.confirmDialog(
-				t='wOAH there.',
-				m='You have a large amount of verts selected this may take a wee while.',
-				button=['Cancel', 'lol do it.'],
-				cb='Cancel',
-				db='lol do it.')
-
-		sel = om2.MGlobal.getActiveSelectionList()
-		self.iter_components = om2.MItSelectionList(sel)
-
+		self.iter_components = None
+		self.mirror = 0
 		self.initialState = []
-		self.store_args = None
 	# end def __init__():
 
 	@staticmethod
@@ -127,23 +113,41 @@ class vertMatch(om2.MPxCommand):
 	# end def createSyntax():
 
 	def doIt(self, args):
-		t = time.time()
-
-		self.store_args = args
+		sel = om2.MGlobal.getActiveSelectionList()
+		self.iter_components = om2.MItSelectionList(sel)
 
 		argDb = om2.MArgDatabase(self.syntax(), args)
 
 		if argDb.isFlagSet(vertMatch.mirrorFlag):
-			mirror = argDb.flagArgumentBool(vertMatch.mirrorFlag, 0)
-		else:
-			mirror = 0
+			self.mirror = argDb.flagArgumentBool(vertMatch.mirrorFlag, 0)
 
+		self.redoIt()
+	# end def doIt():
+
+	def isUndoable(self):
+		return True
+	# end def isUndoable():
+
+	def undoIt(self):
+		self.iter_components.reset()
+		MDagMesh, MObComponent = self.iter_components.getComponent()
+		iter_undo = om2.MItMeshVertex(MDagMesh, MObComponent)
+
+		i = 0
+		while not iter_undo.isDone():
+			iter_undo.setPosition(self.initialState[i], om2.MSpace.kWorld)
+
+			i += 1
+			iter_undo.next()
+	# end def undoIt():
+
+	def redoIt(self):
 		first_iteration = True
 		tree_ls = []
 		while not self.iter_components.isDone():
 			# First iteration is input points, so skip unless mirror flag is True then reverse the x-axis.
 			if first_iteration:
-				if mirror:
+				if self.mirror:
 					MDagMesh, MObComponent = self.iter_components.getComponent()
 					iter_mirror = om2.MItMeshVertex(MDagMesh, MObComponent)
 
@@ -177,7 +181,7 @@ class vertMatch(om2.MPxCommand):
 			# save for undo
 			self.initialState.append(input_point)
 
-			if mirror:
+			if self.mirror:
 				if input_point[0] >= 0:
 					iter_input.next()
 					continue
@@ -186,30 +190,7 @@ class vertMatch(om2.MPxCommand):
 			iter_input.setPosition(closest, om2.MSpace.kWorld)
 
 			iter_input.next()
-
-		print('>>vertMatch: Matched verts in {}s.'.format(time.time() - t))
-	# end def doIt():
-
-	def isUndoable(self):
-		return True
-	# end def isUndoable
-
-	def undoIt(self):
-		self.iter_components.reset()
-		MDagMesh, MObComponent = self.iter_components.getComponent()
-		iter_undo = om2.MItMeshVertex(MDagMesh, MObComponent)
-
-		i = 0
-		while not iter_undo.isDone():
-			iter_undo.setPosition(self.initialState[i], om2.MSpace.kWorld)
-
-			i += 1
-			iter_undo.next()
-
-	def redoIt(self):
-		self.doIt(self.store_args)
 	# end def redoIt():
-# end class vertMatch():
 
 
 def initializePlugin(plugin):
